@@ -5,243 +5,112 @@
 import type { ApiService } from "../services/api.js";
 import type { CacheService } from "../services/cache.js";
 import type { Status, Priority, Environment, ToolDefinition } from "../types.js";
+import { getCachedResource } from "../utils/cache-helpers.js";
+import { isValidProjectKey } from "../utils/validation.js";
 
 export async function getStatuses(apiService: ApiService, cacheService: CacheService, projectKey?: string): Promise<Status[]> {
     /**
-     * Retrieve available test case and execution statuses.
+     * Get available test execution statuses.
      *
-     * Fetches all status options for test cases and test executions,
-     * with optional project-specific filtering. Results are cached for performance.
+     * Retrieves the list of valid test execution statuses for the project.
+     * Results are cached for performance.
      *
      * Parameters
      * ----------
      * apiService : ApiService
-     *     Configured API service for HTTP communication
+     *     API service for HTTP calls.
      * cacheService : CacheService
-     *     Caching service for performance optimization
+     *     Cache service for storage.
      * projectKey : string, optional
-     *     Project key to filter project-specific statuses
+     *     Optional project key to filter statuses.
      *
      * Returns
      * -------
-     * Status[]
-     *     Array of available status options
+     * Promise<Status[]>
+     *     Array of test status objects.
      *
      * Raises
      * ------
      * Error
-     *     If API request fails
+     *     If API call fails or validation fails.
      */
-    if (!apiService) {
-        throw new Error("ApiService is required");
-    }
-
-    if (!cacheService) {
-        throw new Error("CacheService is required");
-    }
-
-    // Validate project key format if provided
-    if (projectKey && projectKey.trim() !== "" && !isValidProjectKey(projectKey.trim())) {
-        throw new Error("Project key must start with a capital letter and contain only capital letters and numbers");
-    }
-
-    const cacheKey: string = projectKey
-        ? cacheService.generateKey("statuses", projectKey.trim())
-        : cacheService.generateKey("statuses");
-
-    // Try to get from cache first
-    const cachedStatuses: Status[] | undefined = cacheService.get<Status[]>(cacheKey);
-    if (cachedStatuses) {
-        return cachedStatuses;
-    }
-
-    try {
-        const params: Record<string, any> = {};
-        if (projectKey && projectKey.trim() !== "") {
-            params.projectKey = projectKey.trim();
-        }
-
-        const statuses: Status[] = await apiService.get<Status[]>("/statuses", params);
-        const result: Status[] = statuses || [];
-
-        // Validate response format
-        if (!Array.isArray(result)) {
-            throw new Error("Invalid response format: expected array of statuses");
-        }
-
-        // Cache the results with default TTL (5 minutes)
-        cacheService.set(cacheKey, result);
-
-        return result;
-    } catch (error) {
-        if (error instanceof Error) {
-            const context = projectKey ? ` for project ${projectKey}` : "";
-            throw new Error(`Failed to retrieve statuses${context}: ${error.message}`);
-        } else {
-            throw new Error(`Failed to retrieve statuses: Unknown error occurred`);
-        }
-    }
-}
-
-function isValidProjectKey(projectKey: string): boolean {
-    // Project key must start with capital letter and can contain capitals, numbers, and underscores
-    // Allow single character project keys (e.g., "A") as well as multi-character keys
-    const projectKeyPattern = /^[A-Z][A-Z_0-9]*$/;
-    return projectKeyPattern.test(projectKey);
+    return getCachedResource<Status>(
+        apiService,
+        cacheService,
+        "/statuses",
+        "statuses",
+        projectKey
+    );
 }
 
 export async function getPriorities(apiService: ApiService, cacheService: CacheService, projectKey?: string): Promise<Priority[]> {
     /**
-     * Retrieve available test case priorities.
+     * Get available test priorities.
      *
-     * Fetches all priority levels for test cases with optional
-     * project-specific filtering. Results are cached for performance.
+     * Retrieves the list of valid test priorities for the project.
+     * Results are cached for performance.
      *
      * Parameters
      * ----------
      * apiService : ApiService
-     *     Configured API service for HTTP communication
+     *     API service for HTTP calls.
      * cacheService : CacheService
-     *     Caching service for performance optimization
+     *     Cache service for storage.
      * projectKey : string, optional
-     *     Project key to filter project-specific priorities
+     *     Optional project key to filter priorities.
      *
      * Returns
      * -------
-     * Priority[]
-     *     Array of available priority levels
+     * Promise<Priority[]>
+     *     Array of test priority objects.
      *
      * Raises
      * ------
      * Error
-     *     If API request fails
+     *     If API call fails or validation fails.
      */
-    if (!apiService) {
-        throw new Error("ApiService is required");
-    }
-
-    if (!cacheService) {
-        throw new Error("CacheService is required");
-    }
-
-    // Validate project key format if provided
-    if (projectKey && projectKey.trim() !== "" && !isValidProjectKey(projectKey.trim())) {
-        throw new Error("Project key must start with a capital letter and contain only capital letters and numbers");
-    }
-
-    const cacheKey: string = projectKey
-        ? cacheService.generateKey("priorities", projectKey.trim())
-        : cacheService.generateKey("priorities");
-
-    // Try to get from cache first
-    const cachedPriorities: Priority[] | undefined = cacheService.get<Priority[]>(cacheKey);
-    if (cachedPriorities) {
-        return cachedPriorities;
-    }
-
-    try {
-        const params: Record<string, any> = {};
-        if (projectKey && projectKey.trim() !== "") {
-            params.projectKey = projectKey.trim();
-        }
-
-        const priorities: Priority[] = await apiService.get<Priority[]>("/priorities", params);
-        const result: Priority[] = priorities || [];
-
-        // Validate response format
-        if (!Array.isArray(result)) {
-            throw new Error("Invalid response format: expected array of priorities");
-        }
-
-        // Cache the results with default TTL (5 minutes)
-        cacheService.set(cacheKey, result);
-
-        return result;
-    } catch (error) {
-        if (error instanceof Error) {
-            const context = projectKey ? ` for project ${projectKey}` : "";
-            throw new Error(`Failed to retrieve priorities${context}: ${error.message}`);
-        } else {
-            throw new Error(`Failed to retrieve priorities: Unknown error occurred`);
-        }
-    }
+    return getCachedResource<Priority>(
+        apiService,
+        cacheService,
+        "/priorities",
+        "priorities",
+        projectKey
+    );
 }
 
 export async function getEnvironments(apiService: ApiService, cacheService: CacheService, projectKey?: string): Promise<Environment[]> {
     /**
-     * Retrieve available testing environments.
+     * Get available test environments.
      *
-     * Fetches all environment configurations for test execution
-     * with optional project-specific filtering. Results are cached for performance.
+     * Retrieves the list of valid test environments for the project.
+     * Results are cached for performance.
      *
      * Parameters
      * ----------
      * apiService : ApiService
-     *     Configured API service for HTTP communication
+     *     API service for HTTP calls.
      * cacheService : CacheService
-     *     Caching service for performance optimization
+     *     Cache service for storage.
      * projectKey : string, optional
-     *     Project key to filter project-specific environments
+     *     Optional project key to filter environments.
      *
      * Returns
      * -------
-     * Environment[]
-     *     Array of available testing environments
+     * Promise<Environment[]>
+     *     Array of test environment objects.
      *
      * Raises
      * ------
      * Error
-     *     If API request fails
+     *     If API call fails or validation fails.
      */
-    if (!apiService) {
-        throw new Error("ApiService is required");
-    }
-
-    if (!cacheService) {
-        throw new Error("CacheService is required");
-    }
-
-    // Validate project key format if provided
-    if (projectKey && projectKey.trim() !== "" && !isValidProjectKey(projectKey.trim())) {
-        throw new Error("Project key must start with a capital letter and contain only capital letters and numbers");
-    }
-
-    const cacheKey: string = projectKey
-        ? cacheService.generateKey("environments", projectKey.trim())
-        : cacheService.generateKey("environments");
-
-    // Try to get from cache first
-    const cachedEnvironments: Environment[] | undefined = cacheService.get<Environment[]>(cacheKey);
-    if (cachedEnvironments) {
-        return cachedEnvironments;
-    }
-
-    try {
-        const params: Record<string, any> = {};
-        if (projectKey && projectKey.trim() !== "") {
-            params.projectKey = projectKey.trim();
-        }
-
-        const environments: Environment[] = await apiService.get<Environment[]>("/environments", params);
-        const result: Environment[] = environments || [];
-
-        // Validate response format
-        if (!Array.isArray(result)) {
-            throw new Error("Invalid response format: expected array of environments");
-        }
-
-        // Cache the results with default TTL (5 minutes)
-        cacheService.set(cacheKey, result);
-
-        return result;
-    } catch (error) {
-        if (error instanceof Error) {
-            const context = projectKey ? ` for project ${projectKey}` : "";
-            throw new Error(`Failed to retrieve environments${context}: ${error.message}`);
-        } else {
-            throw new Error(`Failed to retrieve environments: Unknown error occurred`);
-        }
-    }
+    return getCachedResource<Environment>(
+        apiService,
+        cacheService,
+        "/environments",
+        "environments",
+        projectKey
+    );
 }
 
 export function createMetadataTools(): ToolDefinition[] {

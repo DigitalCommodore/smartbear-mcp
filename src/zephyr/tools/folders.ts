@@ -4,6 +4,7 @@
 
 import type { ApiService } from "../services/api.js";
 import type { Folder, CreateFolderRequest, ToolDefinition } from "../types.js";
+import { isValidProjectKey, isValidFolderType } from "../utils/validation.js";
 
 export async function getFolders(apiService: ApiService, projectKey: string, folderType?: string): Promise<Folder[]> {
     /**
@@ -70,18 +71,6 @@ export async function getFolders(apiService: ApiService, projectKey: string, fol
             throw new Error(`Failed to retrieve folders for project ${cleanProjectKey}: Unknown error occurred`);
         }
     }
-}
-
-function isValidProjectKey(projectKey: string): boolean {
-    // Project key must start with capital letter and contain only capitals and numbers
-    // Based on test expectations: single characters allowed, no underscores
-    const projectKeyPattern = /^[A-Z][A-Z0-9]*$/;
-    return projectKeyPattern.test(projectKey);
-}
-
-function isValidFolderType(folderType: string): boolean {
-    const validTypes = ["TEST_CASE", "TEST_PLAN", "TEST_CYCLE"];
-    return validTypes.includes(folderType);
 }
 
 export async function createFolder(apiService: ApiService, folderData: CreateFolderRequest): Promise<Folder> {

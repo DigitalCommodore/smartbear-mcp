@@ -19,6 +19,11 @@ import type {
     TestCaseLinkList,
     TestCaseVersionLink
 } from "../types.js";
+import {
+    isValidProjectKey,
+    isValidTestCaseKey,
+    isValidIssueKey
+} from "../utils/validation.js";
 
 export async function createTestCase(apiService: ApiService, testCaseData: CreateTestCaseRequest): Promise<TestCase> {
     /**
@@ -61,8 +66,7 @@ export async function createTestCase(apiService: ApiService, testCaseData: Creat
     }
 
     // Validate project key format (API spec allows A-Z, underscore, and numbers)
-    const projectKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+$/;
-    if (!projectKeyPattern.test(testCaseData.projectKey.trim())) {
+    if (!isValidProjectKey(testCaseData.projectKey.trim())) {
         throw new Error(`Invalid project key format: ${testCaseData.projectKey}. Expected format: PROJ or PROJ_TEST`);
     }
 
@@ -238,8 +242,7 @@ export async function updateTestCase(apiService: ApiService, testCaseKey: string
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing underscores in project key)
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -404,8 +407,7 @@ export async function addTestScript(apiService: ApiService, testCaseKey: string,
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing underscores in project key)
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -495,8 +497,7 @@ export async function addTestSteps(apiService: ApiService, testCaseKey: string, 
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing underscores in project key)
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -579,8 +580,7 @@ export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: s
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing single char project keys and underscores)
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]*-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -658,7 +658,7 @@ export async function listTestCasesNextGen(apiService: ApiService, args: {
         throw new Error("projectKey is required");
     }
 
-    if (args.projectKey && !/^[A-Z][A-Z0-9]*$/.test(args.projectKey)) {
+    if (args.projectKey && !isValidProjectKey(args.projectKey)) {
         throw new Error("projectKey must match pattern [A-Z][A-Z0-9]+");
     }
 
@@ -760,8 +760,7 @@ export async function getTestCaseLinks(apiService: ApiService, testCaseKey: stri
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing underscores in project key)
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -828,8 +827,7 @@ export async function createTestCaseWebLink(apiService: ApiService, testCaseKey:
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -906,8 +904,7 @@ export async function listTestCaseVersions(apiService: ApiService, testCaseKey: 
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -987,8 +984,7 @@ export async function getTestCaseVersion(apiService: ApiService, testCaseKey: st
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -1049,8 +1045,7 @@ export async function getTestCaseTestScript(apiService: ApiService, testCaseKey:
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
@@ -1115,8 +1110,7 @@ export async function getTestCaseTestSteps(apiService: ApiService, testCaseKey: 
     const cleanTestCaseKey: string = testCaseKey.trim();
 
     // Validate test case key format
-    const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]+-T\d+$/;
-    if (!testCaseKeyPattern.test(cleanTestCaseKey)) {
+    if (!isValidTestCaseKey(cleanTestCaseKey)) {
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 

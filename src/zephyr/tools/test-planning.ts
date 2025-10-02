@@ -8,14 +8,15 @@
 
 import type { ApiService } from "../services/api.js";
 import type { TestPlan, CreateTestPlanRequest, TestCycle, CreateTestCycleRequest, ToolDefinition } from "../types.js";
+import { createLogger } from "../utils/logger.js";
+import {
+    isValidProjectKey,
+    isValidTestPlanKey,
+    isValidTestCycleKey,
+    isValidISODate
+} from "../utils/validation.js";
 
-// Simple logger implementation for Phase 4 compatibility
-const logger = {
-    debug: (message: string) => console.debug(message),
-    info: (message: string) => console.info(message),
-    warning: (message: string) => console.warn(message),
-    error: (message: string, error?: any) => console.error(message, error)
-};
+const logger = createLogger();
 
 export async function createTestPlan(apiService: ApiService, planData: CreateTestPlanRequest): Promise<TestPlan> {
     /**
@@ -211,8 +212,7 @@ export async function linkTestPlanToCycle(apiService: ApiService, testPlanKey: s
             throw new Error("Test plan key must be a non-empty string");
         }
 
-        const planKeyPattern = /^[A-Z][A-Z0-9_]*-P[0-9]+$/;
-        if (!planKeyPattern.test(testPlanKey)) {
+        if (!isValidTestPlanKey(testPlanKey.trim())) {
             logger.warning(`Invalid test plan key format: ${testPlanKey}`);
             throw new Error("Test plan key must match format PROJECT-P123");
         }
@@ -223,8 +223,7 @@ export async function linkTestPlanToCycle(apiService: ApiService, testPlanKey: s
             throw new Error("Test cycle key must be a non-empty string");
         }
 
-        const cycleKeyPattern = /^[A-Z][A-Z0-9_]*-[RC][0-9]+$/;
-        if (!cycleKeyPattern.test(testCycleKey)) {
+        if (!isValidTestCycleKey(testCycleKey.trim())) {
             logger.warning(`Invalid test cycle key format: ${testCycleKey}`);
             throw new Error("Test cycle key must match format PROJECT-R123 or PROJECT-C123");
         }
@@ -358,59 +357,3 @@ export function createTestPlanningTools(): ToolDefinition[] {
     return tools;
 }
 
-/**
- * Validate ISO 8601 date format.
- *
- * Parameters
- * ----------
- * dateString : string
- *     Date string to validate
- *
- * Returns
- * -------
- * boolean
- *     True if valid ISO format, false otherwise
- */
-function isValidISODate(dateString: string): boolean {
-    try {
-        // Accept both date-only format (YYYY-MM-DD) and full ISO datetime format
-        const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
-        const isoDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
-        
-        if (!dateOnlyPattern.test(dateString) && !isoDateTimePattern.test(dateString)) {
-            return false;
-        }
-        
-        const date: Date = new Date(dateString);
-        
-        // Check if date is valid (not NaN)
-        if (isNaN(date.getTime())) {
-            return false;
-        }
-        
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Validate project key format.
- *
- * Project keys must be at least 2 characters long, start with a capital letter,
- * and contain only capital letters and numbers. Jira does not allow single-letter
- * project keys.
- *
- * Parameters
- * ----------
- * projectKey : string
- *     Project key to validate
- *
- * Returns
- * -------
- * boolean
- *     True if valid project key format, false otherwise
- */
-function isValidProjectKey(projectKey: string): boolean {
-    return /^[A-Z][A-Z0-9]+$/.test(projectKey.trim());
-}

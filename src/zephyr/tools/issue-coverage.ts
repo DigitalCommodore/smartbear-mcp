@@ -7,6 +7,7 @@
 
 import type { ApiService } from "../services/api.js";
 import type { TestCaseKeyAndVersion, ToolDefinition } from "../types.js";
+import { isValidIssueKey, isValidProjectKey } from "../utils/validation.js";
 
 export async function getIssueCoverage(apiService: ApiService, issueKey: string, projectKey?: string): Promise<TestCaseKeyAndVersion[]> {
     /**
@@ -47,15 +48,18 @@ export async function getIssueCoverage(apiService: ApiService, issueKey: string,
     const cleanIssueKey: string = issueKey.trim();
 
     // Validate issue key format (PROJECT-123)
-    const issueKeyPattern: RegExp = /^[A-Z][A-Z0-9]*-\d+$/;
-    if (!issueKeyPattern.test(cleanIssueKey)) {
+    if (!isValidIssueKey(cleanIssueKey)) {
         throw new Error(`Invalid issue key format: ${cleanIssueKey}. Expected format: PROJECT-123`);
     }
 
     try {
         const params: Record<string, any> = {};
         if (projectKey) {
-            params.projectKey = projectKey.trim();
+            const cleanProjectKey = projectKey.trim();
+            if (!isValidProjectKey(cleanProjectKey)) {
+                throw new Error("Invalid project key format");
+            }
+            params.projectKey = cleanProjectKey;
         }
 
         const response: TestCaseKeyAndVersion[] = await apiService.get<TestCaseKeyAndVersion[]>(`/issuelinks/${cleanIssueKey}/testcases`, params);

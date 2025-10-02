@@ -8,14 +8,15 @@
 
 import type { ApiService } from "../services/api.js";
 import type { TestExecution, CreateTestExecutionRequest, UpdateTestExecutionRequest, ToolDefinition } from "../types.js";
+import { createLogger } from "../utils/logger.js";
+import {
+    isValidProjectKey,
+    isValidTestCaseKey,
+    isValidTestCycleKey,
+    isValidDateFormat
+} from "../utils/validation.js";
 
-// Simple logger implementation for Phase 4 compatibility
-const logger = {
-    debug: (message: string) => console.debug(message),
-    info: (message: string) => console.info(message),
-    warning: (message: string) => console.warn(message),
-    error: (message: string, error?: any) => console.error(message, error)
-};
+const logger = createLogger();
 
 export async function createTestExecution(apiService: ApiService, executionData: CreateTestExecutionRequest): Promise<TestExecution> {
     /**
@@ -82,12 +83,12 @@ export async function createTestExecution(apiService: ApiService, executionData:
         }
 
         // Validate key formats - more permissive, allowing broader patterns
-        if (!isValidTestCaseKeyPattern(executionData.testCaseKey)) {
+        if (!isValidTestCaseKey(executionData.testCaseKey)) {
             logger.warning(`Test case key format may be non-standard: ${executionData.testCaseKey} (expected PROJECT-T123 pattern but allowing flexibility)`);
             // Don't throw error, just warn - let API handle validation
         }
 
-        if (!isValidTestCycleKeyPattern(executionData.testCycleKey)) {
+        if (!isValidTestCycleKey(executionData.testCycleKey)) {
             logger.warning(`Test cycle key format may be non-standard: ${executionData.testCycleKey} (expected PROJECT-R123 or PROJECT-C123 pattern but allowing flexibility)`);
             // Don't throw error, just warn - let API handle validation
         }
@@ -335,90 +336,3 @@ export function createTestExecutionTools(): ToolDefinition[] {
     return tools;
 }
 
-/**
- * Validate test case key format (PROJECT-T123).
- *
- * Parameters
- * ----------
- * key : string
- *     Test case key to validate
- *
- * Returns
- * -------
- * boolean
- *     True if valid format, false otherwise
- */
-function isValidTestCaseKeyPattern(key: string): boolean {
-    // More permissive pattern - allow various project key formats but still check basic structure
-    // Original API spec: .+-T[0-9]+ (allows any project prefix followed by -T and numbers)
-    const pattern: RegExp = /.+-T\d+/;
-    return pattern.test(key);
-}
-
-/**
- * Validate test cycle key format (PROJECT-R123).
- *
- * Parameters
- * ----------
- * key : string
- *     Test cycle key to validate
- *
- * Returns
- * -------
- * boolean
- *     True if valid format, false otherwise
- */
-function isValidTestCycleKeyPattern(key: string): boolean {
-    // More permissive pattern - allow various project key formats
-    // Original API spec: .+-[R|C][0-9]+ (allows any project prefix followed by -R or -C and numbers)  
-    const pattern: RegExp = /.+-[RC]\d+/;
-    return pattern.test(key);
-}
-
-function isValidDateFormat(dateString: string): boolean {
-    try {
-        // More permissive date validation - allow various ISO formats
-        // API spec examples: 2018-05-19 13:15:13+00:00, 2018-05-20 13:15:13+00:00
-        // But also accept Z format: 2024-01-01T10:00:00.000Z
-        const date: Date = new Date(dateString);
-        
-        // Just check if it's a valid date, don't be strict about format
-        return !isNaN(date.getTime());
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Validate ISO 8601 date format.
- *
- * Parameters
- * ----------
- * dateString : string
- *     Date string to validate
- *
- * Returns
- * -------
- * boolean
- *     True if valid ISO format, false otherwise
- */
-function isValidISODate(dateString: string): boolean {
-    try {
-        // The API spec expects format: yyyy-MM-dd'T'HH:mm:ss'Z'
-        // Examples from spec: 2018-05-20 13:15:13+00:00 but also supports Z format
-        // Valid formats: 2024-01-01T10:00:00.000Z, 2024-01-01T10:00:00Z
-        const date: Date = new Date(dateString);
-        
-        // Check if it's a valid date
-        if (isNaN(date.getTime())) {
-            return false;
-        }
-        
-        // Check if it follows ISO format patterns
-        // Accept both .sss and no milliseconds versions with Z suffix
-        const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-        return isoPattern.test(dateString);
-    } catch {
-        return false;
-    }
-}
