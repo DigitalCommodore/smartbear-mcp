@@ -181,7 +181,7 @@ export async function createTestCycle(apiService: ApiService, cycleData: CreateT
     }
 }
 
-export async function linkTestPlanToCycle(apiService: ApiService, testPlanId: number, testCycleId: number): Promise<void> {
+export async function linkTestPlanToCycle(apiService: ApiService, testPlanKey: string, testCycleKey: string): Promise<void> {
     /**
      * Link a test cycle to a test plan.
      *
@@ -192,36 +192,49 @@ export async function linkTestPlanToCycle(apiService: ApiService, testPlanId: nu
      * ----------
      * apiService : ApiService
      *     Configured API service for HTTP communication
-     * testPlanId : number
-     *     ID of the test plan to link to
-     * testCycleId : number
-     *     ID of the test cycle to link
+     * testPlanKey : string
+     *     Key of the test plan to link to (format: PROJECT-P123)
+     * testCycleKey : string
+     *     Key of the test cycle to link (format: PROJECT-R123 or PROJECT-C123)
      *
      * Raises
      * ------
      * Error
      *     If plan or cycle doesn't exist, or link already exists
      */
-    logger.debug(`Entry: linkTestPlanToCycle(testPlanId=${testPlanId}, testCycleId=${testCycleId})`);
+    logger.debug(`Entry: linkTestPlanToCycle(testPlanKey=${testPlanKey}, testCycleKey=${testCycleKey})`);
 
     try {
-        // Validate inputs
-        if (!testPlanId || testPlanId <= 0) {
-            logger.warning(`Invalid test plan ID: ${testPlanId}`);
-            throw new Error("Test plan ID must be a positive number");
+        // Validate test plan key format
+        if (!testPlanKey || typeof testPlanKey !== 'string' || testPlanKey.trim().length === 0) {
+            logger.warning(`Invalid test plan key: ${testPlanKey}`);
+            throw new Error("Test plan key must be a non-empty string");
         }
 
-        if (!testCycleId || testCycleId <= 0) {
-            logger.warning(`Invalid test cycle ID: ${testCycleId}`);
-            throw new Error("Test cycle ID must be a positive number");
+        const planKeyPattern = /^[A-Z][A-Z0-9_]*-P[0-9]+$/;
+        if (!planKeyPattern.test(testPlanKey)) {
+            logger.warning(`Invalid test plan key format: ${testPlanKey}`);
+            throw new Error("Test plan key must match format PROJECT-P123");
+        }
+
+        // Validate test cycle key format
+        if (!testCycleKey || typeof testCycleKey !== 'string' || testCycleKey.trim().length === 0) {
+            logger.warning(`Invalid test cycle key: ${testCycleKey}`);
+            throw new Error("Test cycle key must be a non-empty string");
+        }
+
+        const cycleKeyPattern = /^[A-Z][A-Z0-9_]*-[RC][0-9]+$/;
+        if (!cycleKeyPattern.test(testCycleKey)) {
+            logger.warning(`Invalid test cycle key format: ${testCycleKey}`);
+            throw new Error("Test cycle key must match format PROJECT-R123 or PROJECT-C123");
         }
 
         logger.debug("Validation passed, creating test plan to cycle link via API");
-        await apiService.post<void>(`/testplans/${testPlanId}/links/testcycles`, {
-            testCycleId: testCycleId
+        await apiService.post<void>(`/testplans/${testPlanKey}/links/testcycles`, {
+            testCycleIdOrKey: testCycleKey
         });
 
-        logger.info(`Successfully linked test cycle ${testCycleId} to test plan ${testPlanId}`);
+        logger.info(`Successfully linked test cycle ${testCycleKey} to test plan ${testPlanKey}`);
         logger.debug(`Exit: linkTestPlanToCycle() -> void`);
 
     } catch (error) {
@@ -384,7 +397,9 @@ function isValidISODate(dateString: string): boolean {
 /**
  * Validate project key format.
  *
- * Project keys must start with a capital letter and contain only capital letters and numbers.
+ * Project keys must be at least 2 characters long, start with a capital letter,
+ * and contain only capital letters and numbers. Jira does not allow single-letter
+ * project keys.
  *
  * Parameters
  * ----------

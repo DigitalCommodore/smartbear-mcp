@@ -6,14 +6,15 @@
  */
 
 import type { ApiService } from "../services/api.js";
-import type { TestCase, ToolDefinition } from "../types.js";
+import type { TestCaseKeyAndVersion, ToolDefinition } from "../types.js";
 
-export async function getIssueCoverage(apiService: ApiService, issueKey: string, projectKey?: string): Promise<TestCase[]> {
+export async function getIssueCoverage(apiService: ApiService, issueKey: string, projectKey?: string): Promise<TestCaseKeyAndVersion[]> {
     /**
-     * Retrieve test cases that provide coverage for a specific issue.
+     * Retrieve test case keys and versions that provide coverage for a specific issue.
      *
-     * Fetches all test cases linked to the specified issue key, providing
-     * insight into test coverage for bugs, requirements, or user stories.
+     * Fetches test case identifiers (key + version) linked to the specified issue.
+     * Returns minimal data - use getTestCase(key) to retrieve full test case details.
+     * This enables two-step workflows: (1) get coverage keys, (2) fetch details as needed.
      *
      * Parameters
      * ----------
@@ -26,8 +27,9 @@ export async function getIssueCoverage(apiService: ApiService, issueKey: string,
      *
      * Returns
      * -------
-     * TestCase[]
-     *     Array of test cases that cover the specified issue
+     * TestCaseKeyAndVersion[]
+     *     Array of test case keys and versions with API links.
+     *     Each object contains: {key: string, version: number, self: string}
      *
      * Raises
      * ------
@@ -56,10 +58,10 @@ export async function getIssueCoverage(apiService: ApiService, issueKey: string,
             params.projectKey = projectKey.trim();
         }
 
-        const response: TestCase[] = await apiService.get<TestCase[]>(`/issuelinks/${cleanIssueKey}/testcases`, params);
+        const response: TestCaseKeyAndVersion[] = await apiService.get<TestCaseKeyAndVersion[]>(`/issuelinks/${cleanIssueKey}/testcases`, params);
 
         if (!Array.isArray(response)) {
-            throw new Error(`Invalid API response: Expected array of test cases, got ${typeof response}`);
+            throw new Error(`Invalid API response: Expected array of test case keys and versions, got ${typeof response}`);
         }
 
         return response;
@@ -70,7 +72,7 @@ export async function getIssueCoverage(apiService: ApiService, issueKey: string,
                 throw new Error(`Issue not found: ${cleanIssueKey}. Verify the issue key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied for issue: ${cleanIssueKey}. Check permissions and authentication.`);
+                throw new Error(`Access denied for issue: ${cleanIssueKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("400")) {
                 throw new Error(`Bad request for issue: ${cleanIssueKey}. Verify issue key format and project scope.`);

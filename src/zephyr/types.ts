@@ -205,6 +205,31 @@ export interface Link {
     self: string;
 }
 
+export interface KeyAndVersion {
+    /**
+     * Key and version identifier for test case reference.
+     *
+     * Properties
+     * ----------
+     * key : string
+     *     Test case key in Zephyr format (e.g., PROJECT-T123)
+     * version : integer
+     *     Test case version number
+     */
+    key: string;
+    version: number;
+}
+
+export interface TestCaseKeyAndVersion extends KeyAndVersion, Link {
+    /**
+     * Test case key and version with link reference.
+     *
+     * Returned by GET /issuelinks/{issueKey}/testcases endpoint.
+     * Contains minimal test case identification - use getTestCase()
+     * to retrieve full test case details.
+     */
+}
+
 export interface ResourceId {
     id: number;
 }
@@ -370,10 +395,10 @@ export interface UpdateTestCaseRequest {
      *     Updated estimated duration in milliseconds
      * componentId : number, optional
      *     Updated component ID from Jira
-     * priorityName : string, optional
-     *     Updated priority name (not ID)
-     * statusName : string, optional
-     *     Updated status name (not ID)
+     * priorityId : number, optional
+     *     Updated priority ID
+     * statusId : number, optional
+     *     Updated status ID
      * folderId : number, optional
      *     New folder assignment
      * ownerId : string, optional
@@ -388,8 +413,8 @@ export interface UpdateTestCaseRequest {
     precondition?: string;
     estimatedTime?: number;
     componentId?: number;
-    priorityName?: string;
-    statusName?: string;
+    priorityId?: number;
+    statusId?: number;
     folderId?: number;
     ownerId?: string;
     labels?: string[];
@@ -465,8 +490,11 @@ export interface CreateTestStepsRequest {
      * ----------
      * steps : TestStepInput[]
      *     Array of steps to create
+     * mode : 'APPEND' | 'OVERWRITE', optional
+     *     Mode for adding test steps. APPEND adds to existing steps, OVERWRITE replaces all steps
      */
     steps: TestStepInput[];
+    mode?: "APPEND" | "OVERWRITE";
 }
 
 export interface TestStepInput {
@@ -766,11 +794,20 @@ export interface UpdateTestExecutionRequest {
      *     Updated environment name (matches API field name)
      * actualEndDate : string, optional
      *     Updated execution timestamp in ISO format (matches API field name)
+     * executionTime : number, optional
+     *     Updated execution time in milliseconds
+     * executedById : string, optional
+     *     Updated Jira user account ID of executor
+     * assignedToId : string, optional
+     *     Updated Jira user account ID of assignee
      */
     statusName?: string;
     comment?: string;
     environmentName?: string;
     actualEndDate?: string;
+    executionTime?: number;
+    executedById?: string;
+    assignedToId?: string;
 }
 
 export interface Folder extends BaseEntity {

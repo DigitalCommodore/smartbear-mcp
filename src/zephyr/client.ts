@@ -25,6 +25,7 @@ import {
   getTestCaseTestScript,
   getTestCaseTestSteps
 } from './tools/test-cases.js';
+import { createTestExecution, updateTestExecution } from './tools/test-execution.js';
 
 export class ZephyrClient implements Client {
   private authService: AuthService;
@@ -36,7 +37,6 @@ export class ZephyrClient implements Client {
 
   constructor(
     accessToken?: string,
-    projectKey?: string,
     baseUrl: string = "https://api.zephyrscale.smartbear.com/v2"
   ) {
     try {
@@ -46,9 +46,6 @@ export class ZephyrClient implements Client {
       if (!token) {
         throw new Error("ZEPHYR_ACCESS_TOKEN is required - provide via parameter or environment variable");
       }
-
-      // Get project key from parameter or environment variable
-      const project = projectKey || process.env.ZEPHYR_PROJECT_KEY;
 
       // Initialize services with error handling
       this.authService = new AuthService(token);
@@ -62,16 +59,16 @@ export class ZephyrClient implements Client {
     }
   }
 
-  async listTestCases(projectKey: string): Promise<any> {
-    return this.apiService.get(`/testcases`, { projectKey });
+  async listTestCases(projectKey: string, params?: { maxResults?: number; startAt?: number }): Promise<any> {
+    return this.apiService.get(`/testcases`, { projectKey, ...params });
   }
 
   async getTestCase(testCaseKey: string): Promise<any> {
     return this.apiService.get(`/testcases/${testCaseKey}`);
   }
 
-  async listTestPlans(projectKey: string): Promise<any> {
-    return this.apiService.get(`/testplans`, { projectKey });
+  async listTestPlans(projectKey: string, params?: { maxResults?: number; startAt?: number }): Promise<any> {
+    return this.apiService.get(`/testplans`, { projectKey, ...params });
   }
 
   registerTools(
@@ -86,18 +83,18 @@ export class ZephyrClient implements Client {
       register(
         {
           title: "Get Issue Test Coverage",
-          summary: "Retrieve test cases that provide coverage for a specific JIRA issue",
-          purpose: "Analyze test coverage for bugs, requirements, or user stories",
+          summary: "Retrieve test case keys and versions linked to a specific JIRA issue",
+          purpose: "Identify which test cases cover bugs, requirements, or user stories (returns keys only - use zephyr_get_test_case for full details)",
           useCases: [
             "Check which test cases cover a specific bug or feature",
             "Identify gaps in test coverage for requirements",
-            "Generate coverage reports for stakeholders"
+            "Retrieve test coverage data to create reports for stakeholders"
           ],
           examples: [
             {
               description: "Get coverage for a specific issue",
               parameters: { issueKey: "PROJ-123" },
-              expectedOutput: "List of test cases covering the issue"
+              expectedOutput: "Array of {key, version, self} objects for each linked test case"
             }
           ],
           hints: [
@@ -136,7 +133,7 @@ export class ZephyrClient implements Client {
       register(
         {
           title: "List Test Cases",
-          summary: "List test cases for a project",
+          summary: "List test cases for a project with pagination support",
           parameters: [
             {
               name: "projectKey",
@@ -144,11 +141,26 @@ export class ZephyrClient implements Client {
               description: "JIRA project key",
               required: true,
             },
+            {
+              name: "maxResults",
+              type: z.number().min(1).max(1000).optional(),
+              description: "Maximum number of results per page (default: 10, max: 1000)",
+              required: false,
+            },
+            {
+              name: "startAt",
+              type: z.number().min(0).max(1000000).optional(),
+              description: "Zero-indexed starting position for pagination (default: 0)",
+              required: false,
+            },
           ],
         },
         async (args, _extra) => {
           if (!args.projectKey) throw new Error("projectKey argument is required");
-          const response = await this.listTestCases(args.projectKey);
+          const response = await this.listTestCases(args.projectKey, {
+            maxResults: args.maxResults,
+            startAt: args.startAt,
+          });
           return {
             content: [{ type: "text", text: JSON.stringify(response) }],
           };
@@ -184,7 +196,7 @@ export class ZephyrClient implements Client {
       register(
         {
           title: "List Test Plans",
-          summary: "List test plans for a project",
+          summary: "List test plans for a project with pagination support",
           parameters: [
             {
               name: "projectKey",
@@ -192,11 +204,26 @@ export class ZephyrClient implements Client {
               description: "JIRA project key",
               required: true,
             },
+            {
+              name: "maxResults",
+              type: z.number().min(1).max(1000).optional(),
+              description: "Maximum number of results per page (default: 10, max: 1000)",
+              required: false,
+            },
+            {
+              name: "startAt",
+              type: z.number().min(0).max(1000000).optional(),
+              description: "Zero-indexed starting position for pagination (default: 0)",
+              required: false,
+            },
           ],
         },
         async (args, _extra) => {
           if (!args.projectKey) throw new Error("projectKey argument is required");
-          const response = await this.listTestPlans(args.projectKey);
+          const response = await this.listTestPlans(args.projectKey, {
+            maxResults: args.maxResults,
+            startAt: args.startAt,
+          });
           return {
             content: [{ type: "text", text: JSON.stringify(response) }],
           };
@@ -217,16 +244,16 @@ export class ZephyrClient implements Client {
                 projectKey: z.string().describe("JIRA project key"),
                 objective: z.string().optional().describe("Test case objective"),
                 precondition: z.string().optional().describe("Test precondition"),
-                estimatedTime: z.number().optional().describe("Estimated time in minutes"),
+                estimatedTime: z.number().optional().describe("Estimated duration in milliseconds (e.g., 60000 for 1 minute)"),
                 componentId: z.number().optional().describe("Component ID"),
-                priorityName: z.string().optional().describe("Priority name"),
-                statusName: z.string().optional().describe("Status name"),
+                priorityName: z.string().optional().describe("Priority name (defaults to \"Normal\" unless overridden by project-level configuration)"),
+                statusName: z.string().optional().describe("Status name (defaults to \"Draft\" unless overridden by project-level configuration)"),
                 folderId: z.number().optional().describe("Folder ID"),
                 ownerId: z.string().optional().describe("Owner ID"),
                 labels: z.array(z.string()).optional().describe("Test case labels"),
                 customFields: z.record(z.any()).optional().describe("Custom fields")
               }),
-              description: "Test case data including name, description, and metadata",
+              description: "Test case data including name, objective, and metadata",
               required: true,
             },
           ],
@@ -299,10 +326,10 @@ export class ZephyrClient implements Client {
                 name: z.string().optional().describe("Updated test case name"),
                 objective: z.string().optional().describe("Updated test case objective"),
                 precondition: z.string().optional().describe("Updated test precondition"),
-                estimatedTime: z.number().optional().describe("Updated estimated time in minutes"),
+                estimatedTime: z.number().optional().describe("Updated estimated duration in milliseconds (e.g., 60000 for 1 minute)"),
                 componentId: z.number().optional().describe("Updated component ID"),
-                priorityName: z.string().optional().describe("Updated priority name"),
-                statusName: z.string().optional().describe("Updated status name"),
+                priorityId: z.number().optional().describe("Updated priority ID (numeric)"),
+                statusId: z.number().optional().describe("Updated status ID (numeric)"),
                 folderId: z.number().optional().describe("Updated folder ID"),
                 ownerId: z.string().optional().describe("Updated owner ID"),
                 labels: z.array(z.string()).optional().describe("Updated test case labels"),
@@ -337,17 +364,17 @@ export class ZephyrClient implements Client {
               required: true,
             },
             {
-              name: "issueKey",
-              type: z.string(),
-              description: "JIRA issue key (e.g., PROJECT-123)",
+              name: "issueId",
+              type: z.number(),
+              description: "JIRA issue ID (e.g., 10100)",
               required: true,
             },
           ],
         },
         async (args, _extra) => {
           if (!args.testCaseKey) throw new Error("testCaseKey argument is required");
-          if (!args.issueKey) throw new Error("issueKey argument is required");
-          const response = await linkTestCaseToIssue(this.apiService, args.testCaseKey, args.issueKey);
+          if (!args.issueId) throw new Error("issueId argument is required");
+          const response = await linkTestCaseToIssue(this.apiService, args.testCaseKey, args.issueId);
           return {
             content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
           };
@@ -418,12 +445,21 @@ export class ZephyrClient implements Client {
               description: "Array of test steps with descriptions and expected results",
               required: true,
             },
+            {
+              name: "mode",
+              type: z.enum(["APPEND", "OVERWRITE"]).optional(),
+              description: "Mode for adding steps. APPEND (default) adds new steps to the end of existing test steps (safe, recommended). OVERWRITE deletes all existing test steps and replaces with provided steps. WARNING: OVERWRITE permanently deletes attachments for removed steps. Use with caution.",
+              required: false,
+            },
           ],
         },
         async (args, _extra) => {
           if (!args.testCaseKey) throw new Error("testCaseKey argument is required");
           if (!args.testSteps || args.testSteps.length === 0) throw new Error("testSteps argument is required and cannot be empty");
-          const response = await addTestSteps(this.apiService, args.testCaseKey, { steps: args.testSteps });
+          const response = await addTestSteps(this.apiService, args.testCaseKey, {
+            steps: args.testSteps,
+            mode: args.mode
+          });
           return {
             content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
           };
@@ -603,6 +639,190 @@ export class ZephyrClient implements Client {
         async (args, _extra) => {
           if (!args.testCaseKey) throw new Error("testCaseKey argument is required");
           const response = await getTestCaseTestSteps(this.apiService, args.testCaseKey, args.maxResults, args.startAt);
+          return {
+            content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+          };
+        },
+      );
+      registeredCount++;
+
+      // Register create test execution tool
+      register(
+        {
+          title: "Create Test Execution",
+          summary: "Record test execution results linking test case to test cycle",
+          parameters: [
+            {
+              name: "projectKey",
+              type: z.string(),
+              description: "JIRA project key",
+              required: true,
+            },
+            {
+              name: "testCaseKey",
+              type: z.string(),
+              description: "Test case key (format: PROJECT-T123)",
+              required: true,
+            },
+            {
+              name: "testCycleKey",
+              type: z.string(),
+              description: "Test cycle key (format: PROJECT-R123 or PROJECT-C123)",
+              required: true,
+            },
+            {
+              name: "statusName",
+              type: z.string(),
+              description: "Execution status (e.g., Pass, Fail, Blocked, In Progress, Not Executed)",
+              required: true,
+            },
+            {
+              name: "comment",
+              type: z.string().optional(),
+              description: "Execution comments or failure details",
+              required: false,
+            },
+            {
+              name: "environmentName",
+              type: z.string().optional(),
+              description: "Environment where test was executed (e.g., DEV, QA, STAGING, PROD)",
+              required: false,
+            },
+            {
+              name: "actualEndDate",
+              type: z.string().optional(),
+              description: "End date timestamp in ISO format (e.g., 2024-01-01T10:00:00.000Z)",
+              required: false,
+            },
+            {
+              name: "executionTime",
+              type: z.number().int().min(0).optional(),
+              description: "Execution time in milliseconds",
+              required: false,
+            },
+            {
+              name: "executedById",
+              type: z.string().optional(),
+              description: "Jira user account ID of executor",
+              required: false,
+            },
+            {
+              name: "assignedToId",
+              type: z.string().optional(),
+              description: "Jira user account ID of assignee",
+              required: false,
+            },
+            {
+              name: "testScriptResults",
+              type: z.array(z.object({
+                statusName: z.string(),
+                actualEndDate: z.string().optional(),
+                actualResult: z.string().optional(),
+              })).optional(),
+              description: "Array of test script step results with status and actual result details",
+              required: false,
+            },
+            {
+              name: "customFields",
+              type: z.record(z.any()).optional(),
+              description: "Custom field values as key-value pairs",
+              required: false,
+            },
+          ],
+        },
+        async (args, _extra) => {
+          if (!args.projectKey) throw new Error("projectKey argument is required");
+          if (!args.testCaseKey) throw new Error("testCaseKey argument is required");
+          if (!args.testCycleKey) throw new Error("testCycleKey argument is required");
+          if (!args.statusName) throw new Error("statusName argument is required");
+          const response = await createTestExecution(this.apiService, {
+            projectKey: args.projectKey,
+            testCaseKey: args.testCaseKey,
+            testCycleKey: args.testCycleKey,
+            statusName: args.statusName,
+            comment: args.comment,
+            environmentName: args.environmentName,
+            actualEndDate: args.actualEndDate,
+            executionTime: args.executionTime,
+            executedById: args.executedById,
+            assignedToId: args.assignedToId,
+            testScriptResults: args.testScriptResults,
+            customFields: args.customFields,
+          });
+          return {
+            content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+          };
+        },
+      );
+      registeredCount++;
+
+      // Register update test execution tool
+      register(
+        {
+          title: "Update Test Execution",
+          summary: "Update test execution results with new status, comments, or execution metadata",
+          parameters: [
+            {
+              name: "executionId",
+              type: z.number().int().positive(),
+              description: "ID of the test execution to update",
+              required: true,
+            },
+            {
+              name: "statusName",
+              type: z.string().optional(),
+              description: "Updated execution status",
+              required: false,
+            },
+            {
+              name: "comment",
+              type: z.string().optional(),
+              description: "Updated comments or failure details",
+              required: false,
+            },
+            {
+              name: "environmentName",
+              type: z.string().optional(),
+              description: "Updated environment name",
+              required: false,
+            },
+            {
+              name: "actualEndDate",
+              type: z.string().optional(),
+              description: "Updated end date timestamp in ISO format",
+              required: false,
+            },
+            {
+              name: "executionTime",
+              type: z.number().int().min(0).optional(),
+              description: "Updated execution time in milliseconds",
+              required: false,
+            },
+            {
+              name: "executedById",
+              type: z.string().optional(),
+              description: "Updated executor ID",
+              required: false,
+            },
+            {
+              name: "assignedToId",
+              type: z.string().optional(),
+              description: "Updated assignee ID",
+              required: false,
+            },
+          ],
+        },
+        async (args, _extra) => {
+          if (!args.executionId) throw new Error("executionId argument is required");
+          const response = await updateTestExecution(this.apiService, args.executionId, {
+            statusName: args.statusName,
+            comment: args.comment,
+            environmentName: args.environmentName,
+            actualEndDate: args.actualEndDate,
+            executionTime: args.executionTime,
+            executedById: args.executedById,
+            assignedToId: args.assignedToId,
+          });
           return {
             content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
           };

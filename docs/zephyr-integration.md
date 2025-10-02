@@ -26,35 +26,20 @@ The following environment variables configure the Zephyr integration:
 
 #### Optional
 
-- **`ZEPHYR_PROJECT_KEY`** (optional): Default project scope for operations
-  - Format: Uppercase project key (e.g., `TEST`, `PROJ`, `AGILE`)
-  - When set, tools will default to this project when no explicit project is specified
-  - Example: `ZEPHYR_PROJECT_KEY=MYPROJECT`
-
-- **`ZEPHYR_BASE_URL`** (optional): Custom API endpoint for self-hosted instances
-  - Default: `https://api.zephyrscale.smartbear.com/v2`
+- **`ZEPHYR_BASE_URL`** (optional): Specifies the base URL for all REST API requests. This can vary depending on the region where the Jira instance is pinned to. See [API documentation](https://support.smartbear.com/zephyr-scale-cloud/api-docs/#section/Authentication/Accessing-the-API) for regional endpoints.
+  - Default: `https://api.zephyrscale.smartbear.com/v2` (US region)
   - Format: Full URL with protocol and version
-  - Example: `ZEPHYR_BASE_URL=https://custom.zephyr.com/v2`
+  - Example: `ZEPHYR_BASE_URL=https://eu.api.zephyrscale.smartbear.com/v2` (EU region)
 
-### Configuration Examples
+### Configuration Example
 
-#### Basic Configuration (Cloud)
 ```bash
+# Required: JWT access token for authentication
 export ZEPHYR_ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-export ZEPHYR_PROJECT_KEY="MYPROJECT"
-```
 
-#### Self-Hosted Configuration
-```bash
-export ZEPHYR_ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-export ZEPHYR_PROJECT_KEY="ENTERPRISE"
-export ZEPHYR_BASE_URL="https://zephyr.company.com/v2"
-```
-
-#### Docker Environment
-```dockerfile
-ENV ZEPHYR_ACCESS_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-ENV ZEPHYR_PROJECT_KEY=DOCKER_TESTS
+# Optional: Regional endpoint (defaults to US region)
+# For EU region, use: https://eu.api.zephyrscale.smartbear.com/v2
+export ZEPHYR_BASE_URL="https://api.zephyrscale.smartbear.com/v2"
 ```
 
 ### Validation Steps
@@ -73,21 +58,22 @@ ENV ZEPHYR_PROJECT_KEY=DOCKER_TESTS
         https://api.zephyrscale.smartbear.com/v2/projects
    ```
 
-3. **Project Access**: Verify project key access
-   ```bash
-   curl -H "Authorization: Bearer $ZEPHYR_ACCESS_TOKEN" \
-        https://api.zephyrscale.smartbear.com/v2/projects/$ZEPHYR_PROJECT_KEY
-   ```
-
 ## Available Tools
 
 ### Issue Coverage
 
 Analyze test coverage for Jira issues and requirements.
 
-#### `zephyr_get_issue_test_coverage`
+#### `zephyr_get_issue_coverage`
 
-Retrieve test cases that cover a specific Jira issue.
+Retrieve test case keys and versions that cover a specific Jira issue.
+
+**Note**: This endpoint returns **minimal test case data** (key, version, self link only) per the Zephyr API specification. To get full test case details (objective, steps, status, priority, etc.), use this two-step workflow:
+
+1. Call `zephyr_get_issue_coverage` to get test case keys
+2. Call `zephyr_get_test_case` for each key to retrieve complete details
+
+**Returns**: Array of objects with structure `{key: string, version: number, self: string}`
 
 **Parameters:**
 - `issueKey` (required): Jira issue key (e.g., "PROJECT-123")
@@ -104,7 +90,7 @@ Retrieve test cases that cover a specific Jira issue.
 **Use Cases:**
 - Check which test cases cover a specific bug or feature
 - Identify gaps in test coverage for requirements
-- Generate coverage reports for stakeholders
+- Retrieve test coverage data to create reports for stakeholders
 
 ### Test Case Management
 
@@ -112,10 +98,12 @@ Complete CRUD operations for test case lifecycle management.
 
 #### `zephyr_list_test_cases`
 
-List test cases for a project.
+List test cases for a project with pagination support.
 
 **Parameters:**
 - `projectKey` (required): JIRA project key
+- `maxResults` (optional): Maximum number of results per page (default: 10, max: 1000)
+- `startAt` (optional): Zero-indexed starting position for pagination (default: 0)
 
 #### `zephyr_list_test_cases__nextgen_`
 
@@ -143,10 +131,10 @@ Create a new test case with comprehensive metadata.
   - `projectKey` (required): JIRA project key
   - `objective` (optional): Test case objective
   - `precondition` (optional): Test precondition
-  - `estimatedTime` (optional): Estimated time in minutes
+  - `estimatedTime` (optional): Estimated duration in milliseconds (e.g., 60000 for 1 minute)
   - `componentId` (optional): Component ID
-  - `priorityName` (optional): Priority name
-  - `statusName` (optional): Status name
+  - `priorityName` (optional): Priority name (defaults to "Normal" unless overridden by project-level configuration)
+  - `statusName` (optional): Status name (defaults to "Draft" unless overridden by project-level configuration)
   - `folderId` (optional): Folder ID
   - `ownerId` (optional): Owner ID
   - `labels` (optional): Array of test case labels
@@ -169,29 +157,38 @@ Create a new test case with comprehensive metadata.
 
 Update existing test case properties.
 
+**Note:** While the Zephyr API uses PUT semantics that clear non-specified fields, this tool automatically protects against data loss by fetching the current test case state and merging your updates. You can safely provide only the fields you want to change without worrying about clearing other fields.
+
 **Parameters:**
 - `testCaseKey` (required): Test case key in Zephyr format (e.g., PROJECT-T123)
 - `updateData` (required): Object containing fields to update
   - `name` (optional): Updated test case name
   - `objective` (optional): Updated test case objective
   - `precondition` (optional): Updated test precondition
-  - `estimatedTime` (optional): Updated estimated time in minutes
+  - `estimatedTime` (optional): Updated estimated duration in milliseconds (e.g., 60000 for 1 minute)
   - `componentId` (optional): Updated component ID
-  - `priorityName` (optional): Updated priority name
-  - `statusName` (optional): Updated status name
+  - `priorityId` (optional): Updated priority ID (numeric)
+  - `statusId` (optional): Updated status ID (numeric)
   - `folderId` (optional): Updated folder ID
   - `ownerId` (optional): Updated owner ID
   - `labels` (optional): Updated test case labels
   - `customFields` (optional): Updated custom fields
 
+**Note:** UPDATE operations require numeric IDs for priority and status, while CREATE operations use names. Use `zephyr_get_test_case` to see the current priority and status IDs.
+
 #### `zephyr_add_test_script`
 
-Add executable script or detailed instructions to test case.
+Add or replace test script for a test case.
 
 **Parameters:**
 - `testCaseKey` (required): Test case key in Zephyr format (e.g., PROJECT-T123)
 - `text` (required): Test script content
 - `type` (optional): Test script type - must be 'plain' or 'bdd'. Defaults to 'plain'.
+  - `plain`: Freeform text documentation or test instructions
+  - `bdd`: Behavior-Driven Development format (e.g., Gherkin) for remote execution via API plugin
+  - **Note:** For structured step-by-step test execution, use `zephyr_add_test_steps` instead. Test scripts and test steps are mutually exclusive.
+
+**Warning:** This operation replaces any existing test script. If the test case currently has test steps assigned to it, those steps will be automatically removed when you add/replace the test script. Consider retrieving and saving existing test steps first if you need to preserve them.
 
 #### `zephyr_add_test_steps`
 
@@ -199,10 +196,21 @@ Add structured test steps with expected results.
 
 **Parameters:**
 - `testCaseKey` (required): Test case key in Zephyr format (e.g., PROJECT-T123)
+- `mode` (optional): Mode for adding steps - 'APPEND' or 'OVERWRITE'. Defaults to 'APPEND'.
+  - `APPEND`: Adds new steps to the end of existing test steps (safe, recommended)
+  - `OVERWRITE`: Deletes all existing test steps and replaces with provided steps. **Warning:** Permanently deletes attachments for removed steps. Use with caution.
 - `testSteps` (required): Array of test steps with descriptions and expected results
   - `description` (required): Step description
   - `expectedResult` (required): Expected result
   - `testData` (optional): Test data for this step
+
+**Note on Test Step Types:** The Zephyr Scale API supports two types of test steps:
+- **Inline test steps** (supported by this tool): Direct step definitions with `testData` as a string field for test data values
+- **Delegated test steps** (not currently supported): Steps that call another test case with `parameters` as an array field
+
+This tool creates inline test steps, which is why `testData` is a simple string (e.g., "username: admin, password: test123") rather than a complex parameters object.
+
+**Warning:** If the test case currently has a plain text or BDD test script, that test script will be automatically removed when you add test steps. Test scripts and test steps are mutually exclusive - use `zephyr_add_test_script` for freeform documentation or `zephyr_add_test_steps` for structured execution. Consider retrieving and saving the existing test script first if you need to preserve it.
 
 **Example:**
 ```json
@@ -223,28 +231,102 @@ Add structured test steps with expected results.
 }
 ```
 
-#### `zephyr_link_test_case_to_issue`
-
-Create traceability link between test case and Jira issue.
-
-**Parameters:**
-- `testCaseKey` (required): Test case key in Zephyr format (e.g., PROJECT-T123)
-- `issueId` (required): JIRA issue Id (e.g., 12345)
-
 ### Test Planning
 
 Organize test activities with test plans.
 
 #### `zephyr_list_test_plans`
 
-List test plans for a project.
+List test plans for a project with pagination support.
 
 **Parameters:**
 - `projectKey` (required): JIRA project key
+- `maxResults` (optional): Maximum number of results per page (default: 10, max: 1000)
+- `startAt` (optional): Zero-indexed starting position for pagination (default: 0)
 
-### Test Case Links and Versions
+### Test Execution
 
-Manage test case relationships and versioning.
+Record and track test execution results, linking test cases to test cycles with status updates and detailed execution metadata.
+
+#### `zephyr_create_test_execution`
+
+Record test execution results linking test case to test cycle.
+
+**Note**: If the test case has not been added to the test cycle, this operation will automatically create the relationship between them.
+
+**Parameters:**
+- `projectKey` (required): JIRA project key
+- `testCaseKey` (required): Test case key (format: PROJECT-T123)
+- `testCycleKey` (required): Test cycle key (format: PROJECT-R123 or PROJECT-C123)
+- `statusName` (required): Execution status (e.g., Pass, Fail, Blocked, In Progress, Not Executed)
+- `comment` (optional): Execution comments or failure details
+- `environmentName` (optional): Environment where test was executed (e.g., DEV, QA, STAGING, PROD)
+- `actualEndDate` (optional): End date timestamp in ISO format (e.g., 2024-01-01T10:00:00.000Z)
+- `executionTime` (optional): Execution time in milliseconds
+- `executedById` (optional): Jira user account ID of executor
+- `assignedToId` (optional): Jira user account ID of assignee
+- `testScriptResults` (optional): Array of test script step results with status and actual result details
+- `customFields` (optional): Custom field values as key-value pairs
+
+**Example:**
+```json
+{
+  "projectKey": "PROJ",
+  "testCaseKey": "PROJ-T123",
+  "testCycleKey": "PROJ-R456",
+  "statusName": "Pass",
+  "comment": "All assertions passed successfully",
+  "environmentName": "QA",
+  "executionTime": 45000
+}
+```
+
+**Use Cases:**
+- Record manual test execution results
+- Track automated test outcomes
+- Document test failures with detailed comments
+- Associate executions with specific environments
+
+#### `zephyr_update_test_execution`
+
+Update test execution results with new status, comments, or execution metadata.
+
+**Parameters:**
+- `executionId` (required): ID of the test execution to update
+- `statusName` (optional): Updated execution status
+- `comment` (optional): Updated comments or failure details
+- `environmentName` (optional): Updated environment name
+- `actualEndDate` (optional): Updated end date timestamp in ISO format
+- `executionTime` (optional): Updated execution time in milliseconds
+- `executedById` (optional): Updated executor ID
+- `assignedToId` (optional): Updated assignee ID
+
+**Example:**
+```json
+{
+  "executionId": 12345,
+  "statusName": "Fail",
+  "comment": "Login button not responding on Chrome browser"
+}
+```
+
+**Use Cases:**
+- Update test execution status after retest
+- Add additional failure details
+- Correct execution information
+- Reassign test executions
+
+### Test Case Links
+
+Manage test case relationships to JIRA issues and external resources.
+
+#### `zephyr_link_test_case_to_issue`
+
+Create traceability link between test case and Jira issue.
+
+**Parameters:**
+- `testCaseKey` (required): Test case key in Zephyr format (e.g., PROJECT-T123)
+- `issueId` (required): JIRA issue ID (numeric, e.g., 10100). See [API documentation](https://support.smartbear.com/zephyr-scale-cloud/api-docs/#tag/Test-Cases/operation/createTestCaseIssueLink) for details.
 
 #### `zephyr_get_test_case_links`
 
@@ -262,6 +344,12 @@ Create a web link for a test case.
 - `webLinkData` (required): Web link data with URL and optional description
   - `url` (required): Web link URL (must start with http:// or https://)
   - `description` (optional): Optional description for the web link
+
+**Note:** The `webLinkData` parameter is structured as a nested object to match the Zephyr Cloud API's WebLinkInput schema. While it currently contains only 2 fields, this design follows the pattern used for other CREATE operations (e.g., `createTestCase` uses `testCaseData`) and mirrors the API specification structure. This approach ensures consistency and is extensible if additional fields are added to WebLinkInput in future API versions.
+
+### Test Case Versions
+
+Track test case version history and retrieve historical snapshots.
 
 #### `zephyr_list_test_case_versions`
 
@@ -349,7 +437,7 @@ Complete workflow for creating comprehensive test cases:
   "tool": "zephyr_link_test_case_to_issue",
   "parameters": {
     "testCaseKey": "ECOM-T789",
-    "issueId": "123"
+    "issueId": 10100
   }
 }
 ```
@@ -375,7 +463,7 @@ Analyzing test coverage and ensuring comprehensive testing:
 ```json
 // 1. Analyze issue coverage
 {
-  "tool": "zephyr_get_issue_test_coverage",
+  "tool": "zephyr_get_issue_coverage",
   "parameters": {
     "issueKey": "ECOM-BUG-456",
     "projectKey": "ECOM"
@@ -399,7 +487,7 @@ Analyzing test coverage and ensuring comprehensive testing:
   "tool": "zephyr_link_test_case_to_issue",
   "parameters": {
     "testCaseKey": "ECOM-T790",
-    "issueKey": "ECOM-BUG-456"
+    "issueId": 10456
   }
 }
 ```
@@ -418,7 +506,7 @@ Error: Zephyr API error (GET /projects): Invalid authentication token [Status: 4
 ```
 Error: Zephyr API error (POST /testcases): Insufficient permissions [Status: 403]
 ```
-**Resolution**: Ensure token has required permissions for project and operation
+**Resolution**: Ensure the user account associated with the token has the required permissions for the project and operation (Jira Browse projects permission, read access, and Zephyr Cloud access)
 
 #### Invalid Project Key
 ```
@@ -441,12 +529,13 @@ Error: Network request failed: ECONNREFUSED
 ### Troubleshooting Guide
 
 #### Token Issues
-1. **Expired Token**: Generate new token from Zephyr Cloud account settings
+1. **Expired Token**: Create a new token in Zephyr Cloud account settings
 2. **Invalid Format**: Ensure token is complete JWT with 3 parts separated by dots
-3. **Permissions**: Verify token has required project and API permissions
+3. **Permissions**: Verify the user account associated with the token has required project and API permissions
+   - Verify if the token was created by someone with the Jira `Browse project` project permission.
 
 #### API Connection Issues
-1. **Custom URL**: Verify `ZEPHYR_BASE_URL` is correct for self-hosted instances
+1. **Regional URL**: Verify `ZEPHYR_BASE_URL` matches your Jira instance region (US default or EU). See [API documentation](https://support.smartbear.com/zephyr-scale-cloud/api-docs/#section/Authentication/Accessing-the-API) for regional endpoints.
 2. **SSL/TLS**: Ensure proper certificate configuration for HTTPS endpoints
 3. **Firewall**: Check network firewall rules for API endpoint access
 

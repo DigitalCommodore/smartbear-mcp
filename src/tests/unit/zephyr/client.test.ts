@@ -93,7 +93,6 @@ describe('ZephyrClient', () => {
         vi.clearAllMocks();
         // Clear environment variables
         delete process.env.ZEPHYR_ACCESS_TOKEN;
-        delete process.env.ZEPHYR_PROJECT_KEY;
         delete process.env.ZEPHYR_BASE_URL;
     });
 
@@ -110,7 +109,7 @@ describe('ZephyrClient', () => {
          */
 
         it('should initialize with direct parameters', () => {
-            const client = new ZephyrClient(validAccessToken, "TEST", "https://api.example.com/v2");
+            const client = new ZephyrClient(validAccessToken, "https://api.example.com/v2");
 
             expect(client).toBeInstanceOf(ZephyrClient);
             expect(AuthService).toHaveBeenCalledWith(validAccessToken);

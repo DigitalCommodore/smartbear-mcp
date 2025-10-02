@@ -17,15 +17,14 @@ import type {
     CreatedResource,
     CursorPagedTestCaseList,
     TestCaseLinkList,
-    TestCaseVersionLink,
-    ToolDefinition
+    TestCaseVersionLink
 } from "../types.js";
 
 export async function createTestCase(apiService: ApiService, testCaseData: CreateTestCaseRequest): Promise<TestCase> {
     /**
      * Create a new test case in Zephyr.
      *
-     * Creates a test case with specified name, description, priority, and other
+     * Creates a test case with specified name, objective, priority, and other
      * metadata. Links to project and folder structure as specified.
      *
      * Parameters
@@ -33,7 +32,7 @@ export async function createTestCase(apiService: ApiService, testCaseData: Creat
      * apiService : ApiService
      *     Configured API service for HTTP communication
      * testCaseData : CreateTestCaseRequest
-     *     Test case data including name, description, priority, project, folder
+     *     Test case data including name, objective, precondition, priority, project, folder
      *
      * Returns
      * -------
@@ -97,7 +96,7 @@ export async function createTestCase(apiService: ApiService, testCaseData: Creat
                 throw new Error(`Invalid test case data: ${error.message}. Check required fields and data formats.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot create test case in project ${testCaseData.projectKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot create test case in project ${testCaseData.projectKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("409")) {
                 throw new Error(`Conflict: Test case with similar name may already exist in project ${testCaseData.projectKey}.`);
@@ -158,12 +157,12 @@ async function verifyTestCaseUpdate(
             errors.push(`ComponentId mismatch: expected ${updateData.componentId}, got ${currentState.component?.id || 'null'}`);
         }
 
-        if (updateData.priorityName !== undefined && updateData.priorityName.trim() !== currentState.priority?.name) {
-            errors.push(`PriorityName mismatch: expected "${updateData.priorityName.trim()}", got "${currentState.priority?.name || ''}"`);
+        if (updateData.priorityId !== undefined && updateData.priorityId !== currentState.priority?.id) {
+            errors.push(`PriorityId mismatch: expected ${updateData.priorityId}, got ${currentState.priority?.id || 'null'}`);
         }
 
-        if (updateData.statusName !== undefined && updateData.statusName.trim() !== currentState.status?.name) {
-            errors.push(`StatusName mismatch: expected "${updateData.statusName.trim()}", got "${currentState.status?.name || ''}"`);
+        if (updateData.statusId !== undefined && updateData.statusId !== currentState.status?.id) {
+            errors.push(`StatusId mismatch: expected ${updateData.statusId}, got ${currentState.status?.id || 'null'}`);
         }
 
         if (updateData.folderId !== undefined && updateData.folderId !== currentState.folder?.id) {
@@ -282,12 +281,12 @@ export async function updateTestCase(apiService: ApiService, testCaseKey: string
             payload.componentId = updateData.componentId;
         }
 
-        if (updateData.priorityName !== undefined) {
-            payload.priorityName = updateData.priorityName.trim();
+        if (updateData.priorityId !== undefined) {
+            payload.priority = { id: updateData.priorityId };
         }
 
-        if (updateData.statusName !== undefined) {
-            payload.statusName = updateData.statusName.trim();
+        if (updateData.statusId !== undefined) {
+            payload.status = { id: updateData.statusId };
         }
 
         if (updateData.folderId !== undefined) {
@@ -350,7 +349,7 @@ export async function updateTestCase(apiService: ApiService, testCaseKey: string
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot update test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot update test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("400")) {
                 throw new Error(`Invalid update data for test case ${cleanTestCaseKey}: ${error.message}`);
@@ -441,7 +440,7 @@ export async function addTestScript(apiService: ApiService, testCaseKey: string,
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot add script to test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot add script to test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("400")) {
                 throw new Error(`Invalid script data for test case ${cleanTestCaseKey}: ${error.message}`);
@@ -514,7 +513,7 @@ export async function addTestSteps(apiService: ApiService, testCaseKey: string, 
     try {
         // Transform the input to match Zephyr API schema
         const payload = {
-            mode: "APPEND", // Default to APPEND mode as per API spec
+            mode: stepsData.mode || "APPEND", // Use provided mode or default to APPEND for safety
             items: stepsData.steps.map(step => ({
                 inline: {
                     description: step.description.trim(),
@@ -534,7 +533,7 @@ export async function addTestSteps(apiService: ApiService, testCaseKey: string, 
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot add steps to test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot add steps to test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("400")) {
                 throw new Error(`Invalid steps data for test case ${cleanTestCaseKey}: ${error.message}`);
@@ -544,7 +543,7 @@ export async function addTestSteps(apiService: ApiService, testCaseKey: string, 
     }
 }
 
-export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: string, issueKey: string): Promise<void> {
+export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: string, issueId: number): Promise<void> {
     /**
      * Link a test case to a Jira issue.
      *
@@ -557,13 +556,13 @@ export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: s
      *     Configured API service for HTTP communication
      * testCaseKey : string
      *     Test case key to link
-     * issueKey : string
-     *     Jira issue key to link to
+     * issueId : number
+     *     Jira issue ID to link to
      *
      * Raises
      * ------
      * Error
-     *     If either key is invalid or link already exists
+     *     If either parameter is invalid or link already exists
      */
     if (!apiService) {
         throw new Error("ApiService is required");
@@ -573,12 +572,11 @@ export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: s
         throw new Error("Test case key is required and cannot be empty");
     }
 
-    if (!issueKey || issueKey.trim() === "") {
-        throw new Error("Issue key is required and cannot be empty");
+    if (!issueId || !Number.isInteger(issueId) || issueId < 1) {
+        throw new Error("Issue ID is required and must be a positive integer");
     }
 
     const cleanTestCaseKey: string = testCaseKey.trim();
-    const cleanIssueKey: string = issueKey.trim();
 
     // Validate test case key format (PROJECT-T123, allowing single char project keys and underscores)
     const testCaseKeyPattern: RegExp = /^[A-Z][A-Z_0-9]*-T\d+$/;
@@ -586,15 +584,9 @@ export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: s
         throw new Error(`Invalid test case key format: ${cleanTestCaseKey}. Expected format: PROJECT-T123`);
     }
 
-    // Validate issue key format (PROJECT-123, allowing single char project keys and underscores)
-    const issueKeyPattern: RegExp = /^[A-Z][A-Z_0-9]*-\d+$/;
-    if (!issueKeyPattern.test(cleanIssueKey)) {
-        throw new Error(`Invalid issue key format: ${cleanIssueKey}. Expected format: PROJECT-123`);
-    }
-
     try {
-        const payload: { issueKey: string } = {
-            issueKey: cleanIssueKey
+        const payload: { issueId: number } = {
+            issueId: issueId
         };
 
         await apiService.post<void>(`/testcases/${cleanTestCaseKey}/links/issues`, payload);
@@ -602,16 +594,16 @@ export async function linkTestCaseToIssue(apiService: ApiService, testCaseKey: s
     } catch (error) {
         if (error instanceof Error) {
             if (error.message.includes("404")) {
-                throw new Error(`Resource not found: Either test case ${cleanTestCaseKey} or issue ${cleanIssueKey} does not exist.`);
+                throw new Error(`Resource not found: Either test case ${cleanTestCaseKey} or issue ID ${issueId} does not exist.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot link test case ${cleanTestCaseKey} to issue ${cleanIssueKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot link test case ${cleanTestCaseKey} to issue ID ${issueId}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("409")) {
-                throw new Error(`Conflict: Link between test case ${cleanTestCaseKey} and issue ${cleanIssueKey} already exists.`);
+                throw new Error(`Conflict: Link between test case ${cleanTestCaseKey} and issue ID ${issueId} already exists.`);
             }
             if (error.message.includes("400")) {
-                throw new Error(`Invalid link request: ${error.message}. Verify both keys are valid and accessible.`);
+                throw new Error(`Invalid link request: ${error.message}. Verify test case key and issue ID are valid and accessible.`);
             }
         }
         throw error;
@@ -726,7 +718,7 @@ export async function listTestCasesNextGen(apiService: ApiService, args: {
         } else if (error.response?.status === 401) {
             throw new Error("Authentication failed - check ZEPHYR_ACCESS_TOKEN");
         } else if (error.response?.status === 403) {
-            throw new Error(`Access denied to project '${args.projectKey}'`);
+            throw new Error(`Access denied to project '${args.projectKey}'. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
         }
 
         throw new Error(`Failed to list test cases: ${error.message}`);
@@ -788,7 +780,7 @@ export async function getTestCaseLinks(apiService: ApiService, testCaseKey: stri
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot access links for test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot access links for test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
         }
         throw error;
@@ -867,7 +859,7 @@ export async function createTestCaseWebLink(apiService: ApiService, testCaseKey:
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot create web link for test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot create web link for test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
             if (error.message.includes("400")) {
                 throw new Error(`Invalid web link data for test case ${cleanTestCaseKey}: ${error.message}. Check URL format and description.`);
@@ -947,7 +939,7 @@ export async function listTestCaseVersions(apiService: ApiService, testCaseKey: 
                 throw new Error(`Test case not found: ${cleanTestCaseKey}. Verify the test case key exists and is accessible.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot access versions for test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot access versions for test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
         }
         throw error;
@@ -1015,7 +1007,7 @@ export async function getTestCaseVersion(apiService: ApiService, testCaseKey: st
                 throw new Error(`Test case version not found: ${cleanTestCaseKey} version ${version}. Verify the test case and version exist.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot access version ${version} of test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot access version ${version} of test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
         }
         throw error;
@@ -1077,7 +1069,7 @@ export async function getTestCaseTestScript(apiService: ApiService, testCaseKey:
                 throw new Error(`Test script not found for test case: ${cleanTestCaseKey}. The test case may not have a script or may not exist.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot access test script for test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot access test script for test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
         }
         throw error;
@@ -1166,237 +1158,9 @@ export async function getTestCaseTestSteps(apiService: ApiService, testCaseKey: 
                 throw new Error(`Test steps not found for test case: ${cleanTestCaseKey}. The test case may not have steps or may not exist.`);
             }
             if (error.message.includes("403")) {
-                throw new Error(`Access denied: Cannot access test steps for test case ${cleanTestCaseKey}. Check permissions.`);
+                throw new Error(`Access denied: Cannot access test steps for test case ${cleanTestCaseKey}. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access).`);
             }
         }
         throw error;
     }
-}
-
-export function createTestCaseTools(): ToolDefinition[] {
-    /**
-     * Create MCP tool definitions for test case operations.
-     *
-     * Returns comprehensive tool definitions for all test case management
-     * operations including creation, updates, scripts, steps, and linking.
-     *
-     * Returns
-     * -------
-     * ToolDefinition[]
-     *     Array containing all test case tool definitions
-     */
-    return [
-        {
-            name: "zephyr_create_test_case",
-            description: "Create a new test case with specified properties including name, description, priority, and folder assignment.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    name: {
-                        type: "string",
-                        description: "Test case name/title (required)",
-                        minLength: 1,
-                        examples: ["Login functionality test", "User registration validation", "Payment processing verification"]
-                    },
-                    description: {
-                        type: "string",
-                        description: "Detailed test case description",
-                        examples: ["Verify that users can successfully login with valid credentials", "Validate user registration form with various input scenarios"]
-                    },
-                    projectKey: {
-                        type: "string",
-                        description: "Project key where the test case will be created",
-                        pattern: "^[A-Z][A-Z0-9]*$",
-                        examples: ["PROJ", "DEV", "QA"]
-                    },
-                    folderId: {
-                        type: "number",
-                        description: "Optional folder ID for organization",
-                        examples: [123, 456, 789]
-                    },
-                    priorityId: {
-                        type: "number",
-                        description: "Optional priority level ID",
-                        examples: [1, 2, 3]
-                    },
-                    statusId: {
-                        type: "number",
-                        description: "Optional initial status ID",
-                        examples: [1, 2, 3]
-                    }
-                },
-                required: ["name", "projectKey"],
-                additionalProperties: false
-            }
-        },
-        {
-            name: "zephyr_update_test_case",
-            description: "Update existing test case properties. Only specified fields will be updated, preserving other existing data.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    testCaseKey: {
-                        type: "string",
-                        description: "Test case key to update",
-                        pattern: "^[A-Z][A-Z0-9]*-T\\d+$",
-                        examples: ["PROJ-T123", "DEV-T456", "QA-T789"]
-                    },
-                    name: {
-                        type: "string",
-                        description: "Updated test case name",
-                        minLength: 1
-                    },
-                    description: {
-                        type: "string",
-                        description: "Updated description"
-                    },
-                    folderId: {
-                        type: "number",
-                        description: "Updated folder assignment"
-                    },
-                    priorityId: {
-                        type: "number",
-                        description: "Updated priority level"
-                    },
-                    statusId: {
-                        type: "number",
-                        description: "Updated status"
-                    }
-                },
-                required: ["testCaseKey"],
-                additionalProperties: false
-            }
-        },
-        {
-            name: "zephyr_add_test_script",
-            description: "Add test script or detailed instructions to an existing test case for manual or automated execution.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    testCaseKey: {
-                        type: "string",
-                        description: "Test case key to add script to",
-                        pattern: "^[A-Z][A-Z0-9]*-T\\d+$",
-                        examples: ["PROJ-T123", "DEV-T456", "QA-T789"]
-                    },
-                    text: {
-                        type: "string",
-                        description: "Script content or detailed testing instructions",
-                        minLength: 1,
-                        examples: [
-                            "1. Navigate to login page\n2. Enter valid credentials\n3. Click login button\n4. Verify successful login",
-                            "selenium.get('https://app.com/login'); selenium.find_element_by_id('username').send_keys('user'); selenium.find_element_by_id('password').send_keys('pass'); selenium.find_element_by_id('login').click();"
-                        ]
-                    },
-                    type: {
-                        type: "string",
-                        description: "Script type - must be 'plain' or 'bdd'. Defaults to 'plain'.",
-                        enum: ["plain", "bdd"],
-                        default: "plain",
-                        examples: ["plain", "bdd"]
-                    }
-                },
-                required: ["testCaseKey", "text"],
-                additionalProperties: false
-            }
-        },
-        {
-            name: "zephyr_add_test_steps",
-            description: "Add structured test steps to a test case, defining step-by-step execution procedure with expected results.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    testCaseKey: {
-                        type: "string",
-                        description: "Test case key to add steps to",
-                        pattern: "^[A-Z][A-Z0-9]*-T\\d+$",
-                        examples: ["PROJ-T123", "DEV-T456", "QA-T789"]
-                    },
-                    steps: {
-                        type: "array",
-                        description: "Array of test steps to add",
-                        minItems: 1,
-                        items: {
-                            type: "object",
-                            properties: {
-                                description: {
-                                    type: "string",
-                                    description: "Step action description",
-                                    minLength: 1,
-                                    examples: ["Navigate to login page", "Enter username", "Click submit button"]
-                                },
-                                expectedResult: {
-                                    type: "string",
-                                    description: "Expected outcome of the action",
-                                    minLength: 1,
-                                    examples: ["Login page displays", "Username field accepts input", "Form submission successful"]
-                                },
-                                testData: {
-                                    type: "string",
-                                    description: "Test data needed for this step",
-                                    examples: ["testuser@example.com", "validPassword123", "John Doe"]
-                                }
-                            },
-                            required: ["description", "expectedResult"],
-                            additionalProperties: false
-                        }
-                    }
-                },
-                required: ["testCaseKey", "steps"],
-                additionalProperties: false
-            }
-        },
-        {
-            name: "zephyr_link_test_case_to_issue",
-            description: "Create bidirectional link between a test case and a JIRA issue for traceability and coverage tracking.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    testCaseKey: {
-                        type: "string",
-                        description: "Test case key to link",
-                        pattern: "^[A-Z][A-Z0-9]*-T\\d+$",
-                        examples: ["PROJ-T123", "DEV-T456", "QA-T789"]
-                    },
-                    issueKey: {
-                        type: "string",
-                        description: "JIRA issue key to link to",
-                        pattern: "^[A-Z][A-Z0-9]*-\\d+$",
-                        examples: ["PROJ-123", "DEV-456", "BUG-789"]
-                    }
-                },
-                required: ["testCaseKey", "issueKey"],
-                additionalProperties: false
-            }
-        },
-        {
-            name: "zephyr_list_testcases",
-            description: "List Zephyr test cases for a project using cursor-based pagination (nextgen endpoint). Perform page-1 and page-2 fetches and return both pages plus basic assertions about pagination correctness.",
-            inputSchema: {
-                type: "object",
-                properties: {
-                    projectKey: {
-                        type: "string",
-                        description: "Jira project key, e.g. 'ZEP'",
-                        pattern: "^[A-Z][A-Z0-9]*$",
-                        examples: ["ZEP", "PROJ", "DEV", "QA"]
-                    },
-                    maxResults: {
-                        type: "number",
-                        description: "Page size to request from Zephyr (defaults to 2 for testing)",
-                        minimum: 1,
-                        maximum: 1000,
-                        examples: [2, 10, 25, 50]
-                    },
-                    cursor: {
-                        type: "string",
-                        description: "If provided, fetches only the page for this cursor (advanced use)",
-                        examples: ["123", "456", "789"]
-                    }
-                },
-                required: ["projectKey"],
-                additionalProperties: false
-            }
-        }
-    ];
 }

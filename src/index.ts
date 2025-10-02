@@ -26,6 +26,7 @@ async function main() {
   const pactBrokerUsername = process.env.PACT_BROKER_USERNAME;
   const pactBrokerPassword = process.env.PACT_BROKER_PASSWORD;
   const zephyrAccessToken = process.env.ZEPHYR_ACCESS_TOKEN;
+  const zephyrBaseUrl = process.env.ZEPHYR_BASE_URL;
 
   let client_defined = false;
 
@@ -79,7 +80,7 @@ async function main() {
   }
 
   if (zephyrAccessToken) {
-    server.addClient(new ZephyrClient(zephyrAccessToken));
+    server.addClient(new ZephyrClient(zephyrAccessToken, zephyrBaseUrl));
     client_defined = true;
   }
 

@@ -190,50 +190,53 @@ describe('Test Planning Tools', () => {
         it('should link test plan to cycle successfully', async () => {
             vi.mocked(mockApiService.post).mockResolvedValue(undefined);
 
-            const result = await linkTestPlanToCycle(mockApiService, 1, 2);
+            const result = await linkTestPlanToCycle(mockApiService, "PROJ-P10", "PROJ-R20");
 
-            expect(mockApiService.post).toHaveBeenCalledWith('/testplans/1/links/testcycles', {
-                testCycleId: 2
+            expect(mockApiService.post).toHaveBeenCalledWith('/testplans/PROJ-P10/links/testcycles', {
+                testCycleIdOrKey: "PROJ-R20"
             });
             expect(result).toBeUndefined();
         });
 
-        it('should validate plan ID', async () => {
-            await expect(linkTestPlanToCycle(mockApiService, 0, 1)).rejects.toThrow();
-            await expect(linkTestPlanToCycle(mockApiService, -1, 1)).rejects.toThrow();
+        it('should validate plan key format', async () => {
+            await expect(linkTestPlanToCycle(mockApiService, "", "PROJ-R20")).rejects.toThrow("Test plan key must be a non-empty string");
+            await expect(linkTestPlanToCycle(mockApiService, "invalid-key", "PROJ-R20")).rejects.toThrow("Test plan key must match format PROJECT-P123");
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-T123", "PROJ-R20")).rejects.toThrow("Test plan key must match format PROJECT-P123");
         });
 
-        it('should validate cycle ID', async () => {
-            await expect(linkTestPlanToCycle(mockApiService, 1, 0)).rejects.toThrow();
-            await expect(linkTestPlanToCycle(mockApiService, 1, -1)).rejects.toThrow();
+        it('should validate cycle key format', async () => {
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-P10", "")).rejects.toThrow("Test cycle key must be a non-empty string");
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-P10", "invalid-key")).rejects.toThrow("Test cycle key must match format PROJECT-R123 or PROJECT-C123");
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-P10", "PROJ-T123")).rejects.toThrow("Test cycle key must match format PROJECT-R123 or PROJECT-C123");
         });
 
-        it('should validate both IDs', async () => {
-            await expect(linkTestPlanToCycle(mockApiService, 0, 0)).rejects.toThrow();
+        it('should validate both keys', async () => {
+            await expect(linkTestPlanToCycle(mockApiService, "", "")).rejects.toThrow();
         });
 
         it('should handle API service validation', async () => {
-            await expect(linkTestPlanToCycle(null as any, 1, 2)).rejects.toThrow();
+            await expect(linkTestPlanToCycle(null as any, "PROJ-P10", "PROJ-R20")).rejects.toThrow();
         });
 
         it('should handle linking errors', async () => {
             const error = new Error('HTTP 404: Test plan or cycle not found');
             vi.mocked(mockApiService.post).mockRejectedValue(error);
 
-            await expect(linkTestPlanToCycle(mockApiService, 1, 2)).rejects.toThrow();
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-P10", "PROJ-R20")).rejects.toThrow();
         });
 
         it('should handle conflict errors', async () => {
             const error = new Error('HTTP 409: Plans already linked');
             vi.mocked(mockApiService.post).mockRejectedValue(error);
 
-            await expect(linkTestPlanToCycle(mockApiService, 1, 2)).rejects.toThrow();
+            await expect(linkTestPlanToCycle(mockApiService, "PROJ-P10", "PROJ-R20")).rejects.toThrow();
         });
 
-        it('should accept valid positive IDs', async () => {
+        it('should accept valid plan and cycle keys', async () => {
             vi.mocked(mockApiService.post).mockResolvedValue({ success: true });
 
-            await expect(linkTestPlanToCycle(mockApiService, 999, 888)).resolves.not.toThrow();
+            await expect(linkTestPlanToCycle(mockApiService, "SA-P999", "SA-R888")).resolves.not.toThrow();
+            await expect(linkTestPlanToCycle(mockApiService, "TIS-P42", "TIS-C100")).resolves.not.toThrow();
         });
     });
 });

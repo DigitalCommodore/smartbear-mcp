@@ -18,7 +18,7 @@
 </div>
 <br />
 
-A Model Context Protocol (MCP) server which provides AI assistants with seamless access to SmartBear's suite of testing and monitoring tools, including [BugSnag](https://www.bugsnag.com/), [Reflect](https://reflect.run), [API Hub](https://www.smartbear.com/api-hub), [PactFlow](https://pactflow.io/) and [Pact Broker](https://docs.pact.io/)
+A Model Context Protocol (MCP) server which provides AI assistants with seamless access to SmartBear's suite of testing and monitoring tools, including [BugSnag](https://www.bugsnag.com/), [Reflect](https://reflect.run), [API Hub](https://www.smartbear.com/api-hub), [PactFlow](https://pactflow.io/), [Pact Broker](https://docs.pact.io/), and [Zephyr Scale](https://support.smartbear.com/zephyr-scale-cloud/)
 
 ## What is MCP?
 
@@ -32,12 +32,13 @@ See individual guides for suggested prompts and supported tools and resources:
 - [Test Hub](https://developer.smartbear.com/smartbear-mcp/docs/test-hub-integration) - Test management and execution capabilities
 - [API Hub](https://developer.smartbear.com/smartbear-mcp/docs/api-hub-integration) - Portal management capabilities
 - [PactFlow](https://developer.smartbear.com/pactflow/default/getting-started) - Contract testing capabilities
+- [Zephyr Scale](https://developer.smartbear.com/smartbear-mcp/docs/zephyr-integration) - Test case management and issue coverage capabilities
 
 
 ## Prerequisites
 
 - Node.js 20+ and npm
-- Access to SmartBear products (BugSnag, Reflect, or API Hub)
+- Access to SmartBear products (BugSnag, Reflect, API Hub, or Zephyr Scale)
 - Valid API tokens for the products you want to integrate
 
 ## Installation
@@ -73,7 +74,9 @@ Alternatively, you can use `npx` (or globally install) the `@smartbear/mcp` pack
         "PACT_BROKER_BASE_URL": "${input:pact_broker_base_url}",
         "PACT_BROKER_TOKEN": "${input:pact_broker_token}",
         "PACT_BROKER_USERNAME": "${input:pact_broker_username}",
-        "PACT_BROKER_PASSWORD": "${input:pact_broker_password}"
+        "PACT_BROKER_PASSWORD": "${input:pact_broker_password}",
+        "ZEPHYR_ACCESS_TOKEN": "${input:zephyr_access_token}",
+        "ZEPHYR_BASE_URL": "${input:zephyr_base_url}"
       }
     }
   },
@@ -126,6 +129,18 @@ Alternatively, you can use `npx` (or globally install) the `@smartbear/mcp` pack
          "description": "Pact Broker Password",
          "password": true
       },
+      {
+         "id": "zephyr_access_token",
+         "type": "promptString",
+         "description": "Zephyr Scale Access Token - leave blank to disable Zephyr tools",
+         "password": true
+      },
+      {
+         "id": "zephyr_base_url",
+         "type": "promptString",
+         "description": "Zephyr Scale Base URL - optional, defaults to US region",
+         "password": false
+      }
   ]
 }
 ```
@@ -153,6 +168,8 @@ Add the following configuration to your `claude_desktop_config.json` to launch t
         "PACT_BROKER_TOKEN": "your_pactflow_token",
         "PACT_BROKER_USERNAME": "your_pact_broker_username",
         "PACT_BROKER_PASSWORD": "your_pact_broker_password",
+        "ZEPHYR_ACCESS_TOKEN": "your_zephyr_access_token",
+        "ZEPHYR_BASE_URL": "https://api.zephyrscale.smartbear.com/v2"
       }
     }
   }

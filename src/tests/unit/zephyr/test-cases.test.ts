@@ -108,7 +108,7 @@ describe('Test Case Tools', () => {
     describe('updateTestCase', () => {
         const mockUpdateRequest: UpdateTestCaseRequest = {
             name: "Updated test name",
-            priorityName: "Medium"
+            priorityId: 2  // Medium priority ID
         };
 
         const mockUpdatedTestCase: TestCase = {
@@ -144,7 +144,7 @@ describe('Test Case Tools', () => {
         });
 
         it('should handle partial updates', async () => {
-            const partialUpdate = { priorityName: "Low" };
+            const partialUpdate = { priorityId: 1 };  // Low priority ID
             vi.mocked(mockApiService.put).mockResolvedValue(mockUpdatedTestCase);
 
             await updateTestCase(mockApiService, "PROJ-T1", partialUpdate);
@@ -276,40 +276,40 @@ describe('Test Case Tools', () => {
         it('should link test case to issue successfully', async () => {
             vi.mocked(mockApiService.post).mockResolvedValue(undefined);
 
-            const result = await linkTestCaseToIssue(mockApiService, "PROJ-T123", "PROJ-456");
+            const result = await linkTestCaseToIssue(mockApiService, "PROJ-T123", 10100);
 
-            expect(mockApiService.post).toHaveBeenCalledWith('/testcases/PROJ-T123/links/issues', { issueKey: "PROJ-456" });
+            expect(mockApiService.post).toHaveBeenCalledWith('/testcases/PROJ-T123/links/issues', { issueId: 10100 });
             expect(result).toBeUndefined();
         });
 
-        it('should validate issue key format', async () => {
-            const invalidKeys = ["invalid-key", "proj-123", "123-PROJ"];
+        it('should validate issue ID format', async () => {
+            const invalidIds = [0, -1, 1.5, NaN];
 
-            for (const invalidKey of invalidKeys) {
-                await expect(linkTestCaseToIssue(mockApiService, "PROJ-T123", invalidKey)).rejects.toThrow();
+            for (const invalidId of invalidIds) {
+                await expect(linkTestCaseToIssue(mockApiService, "PROJ-T123", invalidId)).rejects.toThrow();
             }
         });
 
         it('should validate test case key format', async () => {
-            await expect(linkTestCaseToIssue(mockApiService, "", "PROJ-123")).rejects.toThrow();
-            await expect(linkTestCaseToIssue(mockApiService, "INVALID", "PROJ-123")).rejects.toThrow();
-            await expect(linkTestCaseToIssue(mockApiService, "PROJ-123", "PROJ-123")).rejects.toThrow();
+            await expect(linkTestCaseToIssue(mockApiService, "", 10100)).rejects.toThrow();
+            await expect(linkTestCaseToIssue(mockApiService, "INVALID", 10100)).rejects.toThrow();
+            await expect(linkTestCaseToIssue(mockApiService, "PROJ-123", 10100)).rejects.toThrow();
         });
 
         it('should handle API errors', async () => {
             const error = new Error('HTTP 404: Test case not found');
             vi.mocked(mockApiService.post).mockRejectedValue(error);
 
-            await expect(linkTestCaseToIssue(mockApiService, "PROJ-T123", "PROJ-456")).rejects.toThrow();
+            await expect(linkTestCaseToIssue(mockApiService, "PROJ-T123", 10100)).rejects.toThrow();
         });
 
-        it('should accept valid key formats', async () => {
+        it('should accept valid formats', async () => {
             const validTestCaseKeys = ["A-T1", "PROJ-T123", "ABC123-T456"];
-            const validIssueKeys = ["A-1", "PROJ-123", "ABC123-456"];
+            const validIssueIds = [1, 10100, 99999];
             vi.mocked(mockApiService.post).mockResolvedValue({ success: true });
 
             for (let i = 0; i < validTestCaseKeys.length; i++) {
-                await expect(linkTestCaseToIssue(mockApiService, validTestCaseKeys[i], validIssueKeys[i])).resolves.not.toThrow();
+                await expect(linkTestCaseToIssue(mockApiService, validTestCaseKeys[i], validIssueIds[i])).resolves.not.toThrow();
             }
         });
     });

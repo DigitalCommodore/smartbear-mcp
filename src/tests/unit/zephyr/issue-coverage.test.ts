@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getIssueCoverage, createIssueCoverageTools } from "../../../zephyr/tools/issue-coverage.js";
 import type { ApiService } from "../../../zephyr/services/api.js";
-import type { TestCase } from "../../../zephyr/types.js";
+import type { TestCaseKeyAndVersion } from "../../../zephyr/types.js";
 
 // Mock ApiService
 const mockApiService: ApiService = {
@@ -28,80 +28,22 @@ describe('Issue Coverage Tools', () => {
 
     describe('getIssueCoverage', () => {
         const validIssueKey = "PROJ-123";
-        const mockTestCases: TestCase[] = [
+        const mockTestCaseKeys: TestCaseKeyAndVersion[] = [
             {
-                id: 1,
-                name: "Test login functionality",
                 key: "PROJ-T1",
-                project: {
-                    id: 10005,
-                    self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                },
-                status: {
-                    id: 1,
-                    name: "Approved",
-                    project: {
-                        id: 10005,
-                        self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                    },
-                    description: "Approved status",
-                    index: 1,
-                    color: "#28a745",
-                    default: false
-                },
-                priority: {
-                    id: 3,
-                    name: "High",
-                    project: {
-                        id: 10005,
-                        self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                    },
-                    description: "High priority",
-                    index: 1,
-                    color: "#dc3545",
-                    default: false
-                },
-                createdOn: "2024-01-01T10:00:00.000Z"
+                version: 1,
+                self: "https://api.zephyrscale.smartbear.com/v2/testcases/PROJ-T1/versions/1"
             },
             {
-                id: 2,
-                name: "Test error handling",
                 key: "PROJ-T2",
-                project: {
-                    id: 10005,
-                    self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                },
-                status: {
-                    id: 2,
-                    name: "Draft",
-                    project: {
-                        id: 10005,
-                        self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                    },
-                    description: "Draft status",
-                    index: 2,
-                    color: "#6c757d",
-                    default: true
-                },
-                priority: {
-                    id: 2,
-                    name: "Medium",
-                    project: {
-                        id: 10005,
-                        self: "https://api.zephyrscale.smartbear.com/v2/projects/10005"
-                    },
-                    description: "Medium priority",
-                    index: 2,
-                    color: "#ffc107",
-                    default: false
-                },
-                createdOn: "2024-01-01T10:00:00.000Z"
+                version: 1,
+                self: "https://api.zephyrscale.smartbear.com/v2/testcases/PROJ-T2/versions/1"
             }
         ];
 
         describe('API integration', () => {
             it('should make API request with correct endpoint', async () => {
-                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCases);
+                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCaseKeys);
 
                 await getIssueCoverage(mockApiService, validIssueKey);
 
@@ -112,7 +54,7 @@ describe('Issue Coverage Tools', () => {
             });
 
             it('should include projectKey in API request when provided', async () => {
-                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCases);
+                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCaseKeys);
 
                 await getIssueCoverage(mockApiService, validIssueKey, "PROJ");
 
@@ -122,12 +64,12 @@ describe('Issue Coverage Tools', () => {
                 );
             });
 
-            it('should return test cases from API response', async () => {
-                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCases);
+            it('should return test case keys from API response', async () => {
+                vi.mocked(mockApiService.get).mockResolvedValue(mockTestCaseKeys);
 
                 const result = await getIssueCoverage(mockApiService, validIssueKey);
 
-                expect(result).toEqual(mockTestCases);
+                expect(result).toEqual(mockTestCaseKeys);
             });
 
             it('should handle empty test case array', async () => {
@@ -196,7 +138,7 @@ describe('Issue Coverage Tools', () => {
                 vi.mocked(mockApiService.get).mockRejectedValue(error);
 
                 await expect(getIssueCoverage(mockApiService, validIssueKey)).rejects.toThrow(
-                    "Access denied for issue: PROJ-123. Check permissions and authentication."
+                    "Access denied for issue: PROJ-123. Ensure the user account associated with the token has the required permissions (JIRA Browse projects and Zephyr Cloud access)."
                 );
             });
 
